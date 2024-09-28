@@ -1,0 +1,64 @@
+connect database
+=================================================================================================
+def get_weather_data_from_db():
+    try:
+        # Establish connection to MySQL server
+        mydb = mysql.connector.connect(
+            host="localhost",
+            user="your_username",
+            password="your_password",
+            database="your_database"
+        )
+        mycursor = mydb.cursor()
+
+        # Query weather data from the database
+        query = "SELECT `Temperature (C)`, Humidity, `Wind Speed (km/h)`, `Pressure (millibars)` FROM weather_data_table"
+        mycursor.execute(query)
+
+        # Fetch all rows from the query
+        data = mycursor.fetchall()
+
+        # Convert to pandas DataFrame for easier processing
+        df = pd.DataFrame(data, columns=['Temperature (C)', 'Humidity', 'Wind Speed (km/h)', 'Pressure (millibars)'])
+
+        return df
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return None
+================================================================================================
+ดึงข้อมูลมา แล้ว train ai
+================================================================================================
+# Function to pull weather data from the server and use it in the pipeline
+def fetch_data_and_train_model():
+    # Get data from MySQL server
+    weather_data = get_weather_data_from_db()
+    if weather_data is None:
+        print("Failed to fetch data from the server.")
+        return
+
+    # Prepare the features (X) and the target (y)
+    X_server = weather_data[['Temperature (C)', 'Humidity', 'Wind Speed (km/h)', 'Pressure (millibars)']]
+    y_server = np.random.randint(0, 2, size=len(weather_data))  # Simulating the 'Rain' label
+
+    # Scale the data
+    X_server_scaled = scaler.transform(X_server)  # Assuming scaler is already defined and fitted
+
+    # Split the data into train and test sets (if required)
+    X_train_server, X_test_server, y_train_server, y_test_server = train_test_split(X_server_scaled, y_server, test_size=0.2, shuffle=False)
+
+    # Train the model
+    model.fit(X_train_server, y_train_server, epochs=roun, batch_size=batch_siz, verbose=0)
+
+    # Save the model after training
+    model.save("model_server_data.h5")
+
+    print("Training completed with data from the server.")
+    
+    # Make a prediction using the latest data
+    last_weather_data_server = X_server.iloc[-1].values
+    probability_last_day, rain_message = predict_rain(model, scaler, last_weather_data_server[:3])
+    print(f"Prediction for the last day from server data: {rain_message} with probability {probability_last_day:.2f}%")
+
+# Fetch data from the server and train the model
+fetch_data_and_train_model()

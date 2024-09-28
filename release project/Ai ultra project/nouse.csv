@@ -1,0 +1,5 @@
+temperature,humidity,rainfall,decision
+32,40,0,1
+30,55,1.2,0
+28,60,0,0
+34,30,0,1

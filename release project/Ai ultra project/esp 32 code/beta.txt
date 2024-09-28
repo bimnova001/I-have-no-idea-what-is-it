@@ -1,0 +1,72 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "DHT.h"
+
+#define DHTPIN 4       // Pin ที่เชื่อมกับเซ็นเซอร์ DHT
+#define DHTTYPE DHT22  // กำหนดชนิดเซ็นเซอร์ DHT
+DHT dht(DHTPIN, DHTTYPE);
+
+const char* ssid = "Your_SSID";        // ชื่อ Wi-Fi
+const char* password = "Your_PASSWORD"; // รหัสผ่าน Wi-Fi
+
+const char* serverName = "http://your-server-address/ai-endpoint"; // URL ของ API ที่จะส่งข้อมูลไป
+
+void setup() {
+  Serial.begin(115200);
+  
+  // เชื่อมต่อ Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
+
+  dht.begin();
+}
+
+void loop() {
+  if ((WiFi.status() == WL_CONNECTED)) { // ตรวจสอบว่าเชื่อมต่อ Wi-Fi สำเร็จ
+    HTTPClient http;
+    
+    // เก็บข้อมูลจากเซ็นเซอร์
+    float temperature = dht.readTemperature(); 
+    float humidity = dht.readHumidity();
+
+    // ตรวจสอบความถูกต้องของค่าเซ็นเซอร์
+    if (isnan(temperature) || isnan(humidity)) {
+      Serial.println("Failed to read from DHT sensor!");
+      return;
+    }
+
+    // สร้าง JSON payload
+    String jsonData = "{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}";
+
+    // ส่งข้อมูลไปยังเซิร์ฟเวอร์
+    http.begin(serverName); 
+    http.addHeader("Content-Type", "application/json");
+    
+    int httpResponseCode = http.POST(jsonData);  // ส่งข้อมูลแบบ POST
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();  // รับการตอบกลับจากเซิร์ฟเวอร์
+      Serial.println(httpResponseCode);   // แสดงรหัสการตอบกลับ
+      Serial.println(response);           // แสดงการตอบกลับ
+
+      // วิเคราะห์การตอบกลับ เช่น ถ้าเซิร์ฟเวอร์ส่งคำสั่งให้เปิดปั๊ม
+      if (response.indexOf("ON") >= 0) {
+        // เปิดปั๊มน้ำ หรืออุปกรณ์ที่เชื่อมต่อ
+        Serial.println("Turn on the water pump");
+      } else if (response.indexOf("OFF") >= 0) {
+        // ปิดปั๊มน้ำ หรืออุปกรณ์ที่เชื่อมต่อ
+        Serial.println("Turn off the water pump");
+      }
+
+    } else {
+      Serial.println("Error on HTTP request");
+    }
+    http.end();  // ปิดการเชื่อมต่อ HTTP
+  }
+
+  delay(60000); // รอ 60 วินาทีแล้วทำซ้ำ
+}
